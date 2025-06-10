@@ -138,7 +138,7 @@ async def google_auth(credentials: GoogleCredentials):
         response.set_cookie(
             key="auth_token",
             value=access_token,
-            httponly=True,
+            httponly=False,
             secure=True,  # True in prod
             samesite="none",
             max_age=JWT_EXPIRATION * 60,  # Convert minutes to seconds
