@@ -139,8 +139,8 @@ async def google_auth(credentials: GoogleCredentials):
             key="auth_token",
             value=access_token,
             httponly=True,
-            secure=settings.environment != "dev",  # True in prod
-            samesite="lax",
+            secure=True,  # True in prod
+            samesite="none",
             max_age=JWT_EXPIRATION * 60,  # Convert minutes to seconds
             path="/"
         )
