@@ -132,7 +132,7 @@ async def list_jobs(
         
         # Query with pagination
         jobs = await Job.find(query).skip(skip).limit(limit).to_list()
-        
+        logger.info(jobs)
         return [
             JobResponse(
                 id=str(job.id),
@@ -183,7 +183,9 @@ async def get_job(
         user_role = UserRole(current_user.get("role"))
         user_customer_id = current_user.get("customer_id")
         
-        if user_role != UserRole.SUPER_ADMIN and str(job.customer_id) != user_customer_id:
+        if user_role != UserRole.SUPER_ADMIN and str(job.customer_id.ref.id) != str(user_customer_id.id):
+            # logger.info(job.customer_id)
+            # logger.info(user_customer_id)
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: Can only view your company's jobs"
@@ -242,7 +244,7 @@ async def update_job(
         user_role = UserRole(current_user.get("role"))
         user_customer_id = current_user.get("customer_id")
         
-        if user_role != UserRole.SUPER_ADMIN and str(job.customer_id) != user_customer_id:
+        if user_role != UserRole.SUPER_ADMIN and str(job.customer_id.ref.id) != str(user_customer_id.id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: Can only update your company's jobs"
@@ -320,7 +322,7 @@ async def delete_job(
         user_role = UserRole(current_user.get("role"))
         user_customer_id = current_user.get("customer_id")
         
-        if user_role != UserRole.SUPER_ADMIN and str(job.customer_id) != user_customer_id:
+        if user_role != UserRole.SUPER_ADMIN and str(job.customer_id.ref.id) != str(user_customer_id.id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: Can only delete your company's jobs"
@@ -367,7 +369,7 @@ async def publish_job(
         user_role = UserRole(current_user.get("role"))
         user_customer_id = current_user.get("customer_id")
         
-        if user_role != UserRole.SUPER_ADMIN and str(job.customer_id) != user_customer_id:
+        if user_role != UserRole.SUPER_ADMIN and str(job.customer_id.ref.id) != str(user_customer_id.id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: Can only publish your company's jobs"
