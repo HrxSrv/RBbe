@@ -5,7 +5,7 @@ from loguru import logger
 from app.core.auth import get_current_user
 from app.models import User, Customer
 from app.models.user import UserRole
-from app.schemas.schemas import UserResponse
+from app.schemas.schemas import UserResponse, UserCreate
 from app.core.rbac import require_permission, require_admin, Permission
 
 router = APIRouter()
@@ -133,4 +133,80 @@ async def deactivate_user(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to deactivate user"
+        )
+
+@router.post("/dev/register", response_model=UserResponse)
+async def register_user_dev(
+    user_data: UserCreate,
+    current_user: dict = Depends(require_permission(Permission.CREATE_USER))
+):
+    """
+    DEV ENDPOINT - Register a new user under an existing company.
+    AUTHENTICATION REQUIRED - Only users with CREATE_USER permission can register new users.
+    """
+    try:
+        # Validate the customer exists
+        customer = await Customer.get(user_data.customer_id)
+        if not customer:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Customer not found"
+            )
+        
+        # Check if user already exists
+        existing_user = await User.find_one(User.email == user_data.email)
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User with this email already exists"
+            )
+        
+        # Validate role
+        try:
+            user_role = UserRole(user_data.role)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid role: {user_data.role}. Valid roles: {[role.value for role in UserRole]}"
+            )
+        
+        # Check permissions - only super admins can create users for different companies
+        current_user_role = UserRole(current_user.get("role"))
+        current_customer_id = current_user.get("customer_id")
+        
+        if current_user_role != UserRole.SUPER_ADMIN and str(current_customer_id) != user_data.customer_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Can only create users for your own company"
+            )
+        
+        # Create new user
+        new_user = User(
+            customer_id=user_data.customer_id,
+            email=user_data.email,
+            name=user_data.name,
+            role=user_role,
+            is_active=True
+        )
+        
+        await new_user.insert()
+        logger.info(f"New user registered via dev endpoint: {new_user.email} - {new_user.id} for customer {user_data.customer_id}")
+        
+        return UserResponse(
+            id=str(new_user.id),
+            customer_id=str(new_user.customer_id.ref.id),
+            email=new_user.email,
+            name=new_user.name,
+            role=new_user.role.value,
+            is_active=new_user.is_active,
+            created_at=new_user.created_at
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to register user: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to register user"
         )

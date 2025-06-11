@@ -25,4 +25,5 @@ dependencies = [
     "python-jose[cryptography]>=3.5.0",
     "python-multipart>=0.0.20",
     "uvicorn[standard]>=0.34.3",
+    "opik"
 ]

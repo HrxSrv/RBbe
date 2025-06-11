@@ -6,11 +6,49 @@ from datetime import datetime
 from app.models import Job, Customer, User
 from app.models.job import JobType, JobStatus, SalaryRange
 from app.models.user import UserRole
-from app.schemas.schemas import JobCreate, JobResponse
+from app.schemas.schemas import JobCreate, JobResponse, SalaryRangeResponse
 from app.core.rbac import require_permission, Permission
 from app.api.v1.endpoints.auth import get_current_user
 
 router = APIRouter()
+
+def job_to_response(job: Job) -> JobResponse:
+    """Convert Job model to JobResponse schema"""
+    salary_range_response = None
+    if job.salary_range:
+        salary_range_response = SalaryRangeResponse(
+            min_salary=job.salary_range.min_salary,
+            max_salary=job.salary_range.max_salary,
+            currency=job.salary_range.currency
+        )
+    
+    return JobResponse(
+        id=str(job.id),
+        customer_id=str(job.customer_id),
+        title=job.title,
+        description=job.description,
+        requirements=job.requirements,
+        location=job.location,
+        job_type=job.job_type,
+        status=job.status,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        view_count=job.view_count,
+        application_count=job.application_count,
+        experience_level=job.experience_level,
+        remote_allowed=job.remote_allowed,
+        salary_range=salary_range_response,
+        department=job.department,
+        application_deadline=job.application_deadline,
+        questions=[
+            {
+                "question": q.question,
+                "ideal_answer": q.ideal_answer,
+                "weight": q.weight
+            }
+            for q in job.questions
+        ]
+    )
 
 @router.post("/", response_model=JobResponse)
 async def create_job(
@@ -28,6 +66,15 @@ async def create_job(
                 detail="User customer ID not found"
             )
         
+        # Create salary range if provided
+        salary_range = None
+        if job_data.salary_range:
+            salary_range = SalaryRange(
+                min_salary=job_data.salary_range.min_salary,
+                max_salary=job_data.salary_range.max_salary,
+                currency=job_data.salary_range.currency
+            )
+
         # Create new job
         new_job = Job(
             customer_id=user_customer_id,
@@ -40,6 +87,9 @@ async def create_job(
             status=JobStatus.DRAFT,  # New jobs start as draft
             experience_level=job_data.experience_level,
             remote_allowed=job_data.remote_allowed,
+            salary_range=salary_range,
+            department=job_data.department,
+            application_deadline=job_data.application_deadline,
             questions=[
                 {
                     "question": q.question,
@@ -53,27 +103,7 @@ async def create_job(
         await new_job.save()
         logger.info(f"New job created: {new_job.title} - {new_job.id}")
         
-        return JobResponse(
-            id=str(new_job.id),
-            customer_id=str(new_job.customer_id),
-            title=new_job.title,
-            description=new_job.description,
-            requirements=new_job.requirements,
-            location=new_job.location,
-            job_type=new_job.job_type,
-            status=new_job.status,
-            created_at=new_job.created_at,
-            view_count=new_job.view_count,
-            application_count=new_job.application_count,
-            questions=[
-                {
-                    "question": q.question,
-                    "ideal_answer": q.ideal_answer,
-                    "weight": q.weight
-                }
-                for q in new_job.questions
-            ]
-        )
+        return job_to_response(new_job)
         
     except Exception as e:
         logger.error(f"Failed to create job: {str(e)}")
@@ -194,27 +224,9 @@ async def get_job(
         # Increment view count (TODO: Add rate limiting to prevent spam)
         await job.inc({Job.view_count: 1})
         
-        return JobResponse(
-            id=str(job.id),
-            customer_id=str(job.customer_id),
-            title=job.title,
-            description=job.description,
-            requirements=job.requirements,
-            location=job.location,
-            job_type=job.job_type,
-            status=job.status,
-            created_at=job.created_at,
-            view_count=job.view_count + 1,  # Include the increment
-            application_count=job.application_count,
-            questions=[
-                {
-                    "question": q.question,
-                    "ideal_answer": q.ideal_answer,
-                    "weight": q.weight
-                }
-                for q in job.questions
-            ]
-        )
+        # Reload job to get updated view count
+        updated_job = await Job.get(job_id)
+        return job_to_response(updated_job)
         
     except HTTPException:
         raise
@@ -250,6 +262,15 @@ async def update_job(
                 detail="Access denied: Can only update your company's jobs"
             )
         
+        # Create salary range if provided
+        salary_range = None
+        if job_data.salary_range:
+            salary_range = SalaryRange(
+                min_salary=job_data.salary_range.min_salary,
+                max_salary=job_data.salary_range.max_salary,
+                currency=job_data.salary_range.currency
+            )
+
         # Update job fields
         update_data = {
             Job.title: job_data.title,
@@ -259,6 +280,9 @@ async def update_job(
             Job.job_type: JobType(job_data.job_type),
             Job.experience_level: job_data.experience_level,
             Job.remote_allowed: job_data.remote_allowed,
+            Job.salary_range: salary_range,
+            Job.department: job_data.department,
+            Job.application_deadline: job_data.application_deadline,
             Job.questions: [
                 {
                     "question": q.question,
@@ -273,27 +297,9 @@ async def update_job(
         await job.set(update_data)
         logger.info(f"Job updated: {job.title} - {job.id}")
         
-        return JobResponse(
-            id=str(job.id),
-            customer_id=str(job.customer_id),
-            title=job_data.title,
-            description=job_data.description,
-            requirements=job_data.requirements,
-            location=job_data.location,
-            job_type=job_data.job_type,
-            status=job.status,
-            created_at=job.created_at,
-            view_count=job.view_count,
-            application_count=job.application_count,
-            questions=[
-                {
-                    "question": q.question,
-                    "ideal_answer": q.ideal_answer,
-                    "weight": q.weight
-                }
-                for q in job_data.questions
-            ]
-        )
+        # Reload job to get updated fields
+        updated_job = await Job.get(job_id)
+        return job_to_response(updated_job)
         
     except HTTPException:
         raise
@@ -351,6 +357,116 @@ async def delete_job(
             detail="Failed to delete job"
         )
 
+@router.post("/{job_id}/pause")
+async def pause_job(
+    job_id: str,
+    current_user: dict = Depends(require_permission(Permission.UPDATE_JOB))
+):
+    """Pause an active job"""
+    try:
+        job = await Job.get(job_id)
+        if not job:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Job not found"
+            )
+        
+        # Check if user can update this job
+        user_role = UserRole(current_user.get("role"))
+        user_customer_id = current_user.get("customer_id")
+        
+        if user_role != UserRole.SUPER_ADMIN and str(job.customer_id) != user_customer_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Can only update your company's jobs"
+            )
+        
+        # Can only pause active jobs
+        if job.status != JobStatus.ACTIVE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Can only pause active jobs. Current status: {job.status}"
+            )
+        
+        # Update status to paused
+        await job.set({
+            Job.status: JobStatus.PAUSED,
+            Job.updated_at: datetime.utcnow()
+        })
+        
+        logger.info(f"Job paused: {job.title} - {job.id}")
+        
+        return {
+            "status": "success",
+            "message": f"Job '{job.title}' has been paused",
+            "job_id": str(job.id),
+            "new_status": JobStatus.PAUSED
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to pause job {job_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to pause job"
+        )
+
+@router.post("/{job_id}/resume")
+async def resume_job(
+    job_id: str,
+    current_user: dict = Depends(require_permission(Permission.UPDATE_JOB))
+):
+    """Resume a paused job"""
+    try:
+        job = await Job.get(job_id)
+        if not job:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Job not found"
+            )
+        
+        # Check if user can update this job
+        user_role = UserRole(current_user.get("role"))
+        user_customer_id = current_user.get("customer_id")
+        
+        if user_role != UserRole.SUPER_ADMIN and str(job.customer_id) != user_customer_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Can only update your company's jobs"
+            )
+        
+        # Can only resume paused jobs
+        if job.status != JobStatus.PAUSED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Can only resume paused jobs. Current status: {job.status}"
+            )
+        
+        # Update status to active
+        await job.set({
+            Job.status: JobStatus.ACTIVE,
+            Job.updated_at: datetime.utcnow()
+        })
+        
+        logger.info(f"Job resumed: {job.title} - {job.id}")
+        
+        return {
+            "status": "success",
+            "message": f"Job '{job.title}' has been resumed",
+            "job_id": str(job.id),
+            "new_status": JobStatus.ACTIVE
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to resume job {job_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to resume job"
+        )
+
 @router.post("/{job_id}/publish")
 async def publish_job(
     job_id: str,
@@ -406,18 +522,29 @@ async def publish_job(
             detail="Failed to publish job"
         )
 
-@router.get("/public/list", response_model=List[JobResponse])
-async def list_public_jobs(
+@router.get("/dev/list", response_model=List[JobResponse])
+async def list_dev_jobs(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     location: Optional[str] = Query(None, description="Filter by location"),
     job_type: Optional[str] = Query(None, description="Filter by job type"),
-    remote_allowed: Optional[bool] = Query(None, description="Filter by remote availability")
+    remote_allowed: Optional[bool] = Query(None, description="Filter by remote availability"),
+    current_user: dict = Depends(require_permission(Permission.VIEW_JOB))
 ):
-    """Public endpoint for job seekers to browse active jobs"""
+    """Internal dev endpoint for HR teams to browse jobs with full access including ideal answers"""
     try:
-        # Build query for public jobs (only active jobs from active customers)
-        query = {"status": JobStatus.ACTIVE}
+        user_role = UserRole(current_user.get("role"))
+        user_customer_id = current_user.get("customer_id")
+        
+        # Build query based on user role (same as internal job listing)
+        query = {}
+        
+        if user_role == UserRole.SUPER_ADMIN:
+            # Super admins can see all jobs
+            pass
+        else:
+            # Others only see their company's jobs
+            query["customer_id"] = user_customer_id
         
         # Add filters if provided
         if location:
@@ -439,41 +566,21 @@ async def list_public_jobs(
         # Query with pagination
         jobs = await Job.find(query).skip(skip).limit(limit).to_list()
         
-        return [
-            JobResponse(
-                id=str(job.id),
-                customer_id=str(job.customer_id),
-                title=job.title,
-                description=job.description,
-                requirements=job.requirements,
-                location=job.location,
-                job_type=job.job_type,
-                status=job.status,
-                created_at=job.created_at,
-                view_count=job.view_count,
-                application_count=job.application_count,
-                questions=[
-                    {
-                        "question": q.question,
-                        "ideal_answer": "",  # Hide ideal answers in public view
-                        "weight": q.weight
-                    }
-                    for q in job.questions
-                ]
-            )
-            for job in jobs
-        ]
+        return [job_to_response(job) for job in jobs]
         
     except Exception as e:
-        logger.error(f"Failed to list public jobs: {str(e)}")
+        logger.error(f"Failed to list dev jobs: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve jobs"
         )
 
-@router.get("/public/{job_id}", response_model=JobResponse)
-async def get_public_job(job_id: str):
-    """Public endpoint to view a specific job (no authentication required)"""
+@router.get("/dev/{job_id}", response_model=JobResponse)
+async def get_dev_job(
+    job_id: str,
+    current_user: dict = Depends(require_permission(Permission.VIEW_JOB))
+):
+    """Internal dev endpoint to view a specific job with full access including ideal answers"""
     try:
         job = await Job.get(job_id)
         if not job:
@@ -482,42 +589,27 @@ async def get_public_job(job_id: str):
                 detail="Job not found"
             )
         
-        # Only show active jobs to public
-        if job.status != JobStatus.ACTIVE:
+        # Check if user can access this job
+        user_role = UserRole(current_user.get("role"))
+        user_customer_id = current_user.get("customer_id")
+        
+        if user_role != UserRole.SUPER_ADMIN and str(job.customer_id) != user_customer_id:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Job not available"
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Can only view your company's jobs"
             )
         
         # Increment view count
         await job.inc({Job.view_count: 1})
         
-        return JobResponse(
-            id=str(job.id),
-            customer_id=str(job.customer_id),
-            title=job.title,
-            description=job.description,
-            requirements=job.requirements,
-            location=job.location,
-            job_type=job.job_type,
-            status=job.status,
-            created_at=job.created_at,
-            view_count=job.view_count + 1,
-            application_count=job.application_count,
-            questions=[
-                {
-                    "question": q.question,
-                    "ideal_answer": "",  # Hide ideal answers in public view
-                    "weight": q.weight
-                }
-                for q in job.questions
-            ]
-        )
+        # Reload job to get updated view count
+        updated_job = await Job.get(job_id)
+        return job_to_response(updated_job)
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get public job {job_id}: {str(e)}")
+        logger.error(f"Failed to get dev job {job_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve job"

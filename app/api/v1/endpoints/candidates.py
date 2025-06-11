@@ -16,27 +16,28 @@ from app.schemas.schemas import (
 
 router = APIRouter()
 
-# ========================== PUBLIC JOB APPLICATION ENDPOINTS (NO AUTH) ==========================
+# ========================== HR RESUME UPLOAD SYSTEM (AUTHENTICATION REQUIRED) ==========================
 
-@router.post("/public/apply-to-job/{job_id}", response_model=JobApplicationSuccess)
-async def apply_to_job(
+@router.post("/upload-resume-for-job/{job_id}", response_model=JobApplicationSuccess)
+async def upload_resume_for_job(
     job_id: str,
-    file: UploadFile = File(...),
-    candidate_name: str = Form(...),
-    candidate_email: str = Form(...),
+    resume: UploadFile = File(...),
+    candidate_name: Optional[str] = Form(None),
+    candidate_email: Optional[str] = Form(None),
     candidate_phone: Optional[str] = Form(None),
-    candidate_location: Optional[str] = Form(None)
+    candidate_location: Optional[str] = Form(None),
+    current_user: dict = Depends(require_permission(Permission.WRITE_CANDIDATES))
 ):
     """
-    PUBLIC ENDPOINT - Candidates apply to jobs by uploading resume.
-    NO AUTHENTICATION REQUIRED.
+    HR ENDPOINT - HR uploads candidate resume for specific job.
+    AUTHENTICATION REQUIRED.
     
-    - **job_id**: Job to apply for
-    - **file**: Resume file (PDF, DOC, DOCX)
-    - **candidate_name**: Full name
-    - **candidate_email**: Email address
-    - **candidate_phone**: Phone number (optional)
-    - **candidate_location**: Location (optional)
+    - **job_id**: Job to upload resume for
+    - **resume**: Resume file (PDF, DOC, DOCX)
+    - **candidate_name**: Full name (optional - will be extracted by VLM if not provided)
+    - **candidate_email**: Email address (optional - will be extracted by VLM if not provided)
+    - **candidate_phone**: Phone number (optional - will be extracted by VLM if not provided)
+    - **candidate_location**: Location (optional - will be extracted by VLM if not provided)
     """
     try:
         from app.services.text_extraction import TextExtractionService
@@ -44,7 +45,10 @@ async def apply_to_job(
         from app.models.candidate import Candidate, PersonalInfo, JobApplication, ApplicationStatus, ResumeAnalysis
         from pydantic import EmailStr, ValidationError
         
-        logger.info(f"Public job application started - Job: {job_id}, Candidate: {candidate_email}")
+        user_customer_id = current_user.get("customer_id")
+        uploaded_by_user_id = str(current_user.get("_id"))
+
+        logger.info(f"HR resume upload started - Job: {job_id}, HR User: {current_user.get('email')}")
         
         # 1. Validate and get job
         job = await Job.get(job_id)
@@ -54,47 +58,59 @@ async def apply_to_job(
                 detail="Job not found"
             )
         
-        if job.status != "active":
+        # 2. Verify job belongs to current user's company
+        logger.info(job.customer_id.ref.id)
+        # logger.info(user_customer_id)
+        if str(job.customer_id.ref.id) != str(user_customer_id.id):
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Job is not accepting applications"
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Can only upload resumes for your company's jobs"
             )
         
-        # 2. Validate email format
-        try:
-            EmailStr._validate(candidate_email)
-        except ValidationError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid email format"
+        # 3. Implement optional field system with VLM placeholders
+        candidate_name = candidate_name or "To be extracted by VLM"
+        candidate_email = candidate_email or "To be extracted by VLM"  
+        candidate_phone = candidate_phone or "To be extracted by VLM"
+        candidate_location = candidate_location or "To be extracted by VLM"
+        
+        # 4. Validate email format if provided
+        if candidate_email != "To be extracted by VLM":
+            try:
+                EmailStr._validate(candidate_email)
+            except ValidationError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid email format"
+                )
+        
+        # 5. Check if candidate already applied to this job (if email provided)
+        existing_candidate = None
+        if candidate_email != "To be extracted by VLM":
+            existing_candidate = await Candidate.find_one(
+                {"personal_info.email": candidate_email}
             )
+            
+            if existing_candidate:
+                # Check if already applied to this job
+                for app in existing_candidate.applications:
+                    if app.job_id == job_id:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="This candidate has already been uploaded for this job"
+                        )
         
-        # 3. Check if candidate already applied to this job
-        existing_candidate = await Candidate.find_one(
-            {"personal_info.email": candidate_email}
-        )
+        # 6. Validate and save resume file
+        await FileUploadService.validate_file(resume)
         
-        if existing_candidate:
-            # Check if already applied to this job
-            for app in existing_candidate.applications:
-                if app.job_id == job_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="You have already applied to this job"
-                    )
-        
-        # 4. Validate and save resume file
-        await FileUploadService.validate_file(file)
-        
-        customer_id = str(job.customer_id)
+        customer_id = str(job.customer_id.ref.id)
         candidate_id = str(ObjectId())
         
-        file_metadata = await FileUploadService.save_file(file, candidate_id, customer_id)
+        file_metadata = await FileUploadService.save_file(resume, candidate_id, customer_id)
         
-        # 5. Extract text from resume
+        # 7. Extract text from resume
         extraction_result = await TextExtractionService.extract_text(file_metadata["file_path"])
         
-        # 6. Create or update candidate profile
+        # 8. Create or update candidate profile
         personal_info = PersonalInfo(
             name=candidate_name,
             email=candidate_email,
@@ -109,7 +125,7 @@ async def apply_to_job(
             education=None,  # VLM will extract this
             previous_roles=[],  # VLM will parse this
             matching_score=0.0,  # VLM will calculate this
-            analysis_summary="Resume uploaded - awaiting VLM analysis",
+            analysis_summary="Resume uploaded by HR - awaiting VLM analysis",
             resume_file_path=file_metadata["file_path"]
         )
         
@@ -119,16 +135,19 @@ async def apply_to_job(
             application_date=datetime.utcnow(),
             status=ApplicationStatus.APPLIED,
             matching_score=0.0,  # VLM will calculate this
-            notes=f"Applied via public portal for: {job.title}"
+            notes=f"Uploaded by HR user {current_user.get('email')} for: {job.title}"
         )
         
         if existing_candidate:
             # Add application to existing candidate
             existing_candidate.applications.append(job_application)
             existing_candidate.total_applications += 1
+            # Update upload tracking
+            existing_candidate.uploaded_by = uploaded_by_user_id
+            existing_candidate.upload_source = "hr_upload"
             await existing_candidate.save()
             candidate_id = str(existing_candidate.id)
-            logger.info(f"Added application to existing candidate: {candidate_email}")
+            logger.info(f"Added application to existing candidate by HR: {current_user.get('email')}")
         else:
             # Create new candidate
             new_candidate = Candidate(
@@ -137,30 +156,36 @@ async def apply_to_job(
                 resume_analysis=resume_analysis,
                 applications=[job_application],
                 total_applications=1,
-                status="active"
+                status="active",
+                # ✅ NEW: Upload tracking for internal HR tool
+                uploaded_by=uploaded_by_user_id,
+                upload_source="hr_upload"
             )
             await new_candidate.insert()
-            logger.info(f"Created new candidate: {candidate_email}")
+            logger.info(f"Created new candidate by HR: {current_user.get('email')}")
         
-        # 7. Update job application count
+        # 9. Update job application count
         await job.inc({"application_count": 1})
         
-        logger.info(f"Job application successful - Job: {job.title}, Candidate: {candidate_email}")
+        logger.info(f"HR resume upload successful - Job: {job.title}, HR User: {current_user.get('email')}")
         
         return JobApplicationSuccess(
             status="success",
-            message="Application submitted successfully! You will be contacted if selected for the next round.",
+            message="Resume uploaded successfully! VLM analysis will be performed to extract candidate information.",
             application_details={
                 "job_title": job.title,
-                "company": str(job.customer_id),  # In production, fetch company name
+                "company": str(job.customer_id.ref.id),  # In production, fetch company name
                 "candidate_id": candidate_id,
-                "application_date": datetime.utcnow().isoformat(),
-                "resume_filename": file.filename
+                "upload_date": datetime.utcnow().isoformat(),
+                "resume_filename": resume.filename,
+                "uploaded_by": current_user.get("email"),
+                "upload_source": "hr_upload"
             },
             next_steps=[
-                "Your resume will be analyzed by our AI system",
-                "If you're a good match, you may receive a call within 24-48 hours",
-                "Please keep your phone available for potential screening calls"
+                "Resume will be analyzed by VLM to extract missing candidate information",
+                "VLM will perform job matching analysis",
+                "HR team can review analysis results and schedule calls",
+                "Candidate status can be updated through internal management system"
             ]
         )
         
@@ -168,7 +193,7 @@ async def apply_to_job(
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        logger.error(f"Job application failed - Job: {job_id}, Email: {candidate_email}, Error: {e}")
+        logger.error(f"HR resume upload failed - Job: {job_id}, HR User: {current_user.get('email')}, Error: {e}")
         
         # Cleanup file on failure
         if 'file_metadata' in locals():
@@ -179,76 +204,241 @@ async def apply_to_job(
         
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Application submission failed. Please try again."
+            detail="Resume upload failed. Please try again."
         )
 
-@router.get("/public/application-status/{candidate_email}", response_model=ApplicationStatusResponse)
-async def check_application_status(candidate_email: str):
+@router.post("/upload-resume", response_model=JobApplicationSuccess)
+async def upload_resume_general(
+    resume: UploadFile = File(...),
+    candidate_name: Optional[str] = Form(None),
+    candidate_email: Optional[str] = Form(None),
+    candidate_phone: Optional[str] = Form(None),
+    candidate_location: Optional[str] = Form(None),
+    current_user: dict = Depends(require_permission(Permission.WRITE_CANDIDATES))
+):
     """
-    PUBLIC ENDPOINT - Check application status by email.
-    NO AUTHENTICATION REQUIRED.
+    HR ENDPOINT - HR uploads candidate resume to general candidate pool.
+    AUTHENTICATION REQUIRED.
     
-    - **candidate_email**: Email address used for applications
+    - **resume**: Resume file (PDF, DOC, DOCX)
+    - **candidate_name**: Full name (optional - will be extracted by VLM if not provided)
+    - **candidate_email**: Email address (optional - will be extracted by VLM if not provided)
+    - **candidate_phone**: Phone number (optional - will be extracted by VLM if not provided)
+    - **candidate_location**: Location (optional - will be extracted by VLM if not provided)
     """
     try:
-        from app.models.candidate import Candidate
-        from app.models.job import Job
+        from app.services.text_extraction import TextExtractionService
+        from app.models.candidate import Candidate, PersonalInfo, ResumeAnalysis
         from pydantic import EmailStr, ValidationError
         
-        # Validate email format
-        try:
-            EmailStr._validate(candidate_email)
-        except ValidationError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid email format"
-            )
+        user_customer_id = current_user.get("customer_id")
+        uploaded_by_user_id = str(current_user.get("_id"))
         
-        # Find candidate by email
-        candidate = await Candidate.find_one(
-            {"personal_info.email": candidate_email}
+        logger.info(f"HR general resume upload started by HR User: {current_user.get('email')}")
+        
+        # 1. Implement optional field system with VLM placeholders
+        candidate_name = candidate_name or "To be extracted by VLM"
+        candidate_email = candidate_email or "To be extracted by VLM"  
+        candidate_phone = candidate_phone or "To be extracted by VLM"
+        candidate_location = candidate_location or "To be extracted by VLM"
+        
+        # 2. Validate email format if provided
+        if candidate_email != "To be extracted by VLM":
+            try:
+                EmailStr._validate(candidate_email)
+            except ValidationError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid email format"
+                )
+        
+        # 3. Check if candidate already exists (if email provided)
+        existing_candidate = None
+        if candidate_email != "To be extracted by VLM":
+            existing_candidate = await Candidate.find_one(
+                {"personal_info.email": candidate_email}
+            )
+            
+            if existing_candidate:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Candidate with this email already exists. Use associate-job endpoint to link to jobs."
+                )
+        
+        # 4. Validate and save resume file
+        await FileUploadService.validate_file(resume)
+        
+        customer_id = str(user_customer_id.ref.id)
+        candidate_id = str(ObjectId())
+        
+        file_metadata = await FileUploadService.save_file(resume, candidate_id, customer_id)
+        
+        # 5. Extract text from resume
+        extraction_result = await TextExtractionService.extract_text(file_metadata["file_path"])
+        
+        # 6. Create candidate profile
+        personal_info = PersonalInfo(
+            name=candidate_name,
+            email=candidate_email,
+            phone=candidate_phone,
+            location=candidate_location
         )
         
+        # Basic resume analysis (VLM integration can enhance this later)
+        resume_analysis = ResumeAnalysis(
+            skills=[],  # VLM will populate this
+            experience_years=0,  # VLM will analyze this
+            education=None,  # VLM will extract this
+            previous_roles=[],  # VLM will parse this
+            matching_score=0.0,  # VLM will calculate this
+            analysis_summary="Resume uploaded to general pool by HR - awaiting VLM analysis",
+            resume_file_path=file_metadata["file_path"]
+        )
+        
+        # Create new candidate (no specific job application)
+        new_candidate = Candidate(
+            id=candidate_id,
+            personal_info=personal_info,
+            resume_analysis=resume_analysis,
+            applications=[],  # No specific job applications yet
+            total_applications=0,
+            status="active",
+            # ✅ NEW: Upload tracking for internal HR tool
+            uploaded_by=uploaded_by_user_id,
+            upload_source="hr_upload"
+        )
+        await new_candidate.insert()
+        
+        logger.info(f"General candidate upload successful by HR: {current_user.get('email')}")
+        
+        return JobApplicationSuccess(
+            status="success",
+            message="Resume uploaded to general candidate pool successfully! VLM analysis will extract candidate information.",
+            application_details={
+                "job_title": "General Candidate Pool",
+                "company": user_customer_id,
+                "candidate_id": candidate_id,
+                "upload_date": datetime.utcnow().isoformat(),
+                "resume_filename": resume.filename,
+                "uploaded_by": current_user.get("email"),
+                "upload_source": "hr_upload"
+            },
+            next_steps=[
+                "Resume will be analyzed by VLM to extract candidate information",
+                "Candidate can be associated with specific jobs using associate-job endpoint",
+                "VLM will perform job matching when candidate is linked to jobs",
+                "HR team can review and manage candidate through internal system"
+            ]
+        )
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"HR general resume upload failed - HR User: {current_user.get('email')}, Error: {e}")
+        
+        # Cleanup file on failure
+        if 'file_metadata' in locals():
+            try:
+                await FileUploadService.delete_file(file_metadata["file_path"])
+            except:
+                pass
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Resume upload failed. Please try again."
+        )
+
+@router.post("/{candidate_id}/associate-job/{job_id}")
+async def associate_candidate_with_job(
+    candidate_id: str,
+    job_id: str,
+    current_user: dict = Depends(require_permission(Permission.WRITE_CANDIDATES))
+):
+    """
+    HR ENDPOINT - Associate existing candidate with a specific job.
+    AUTHENTICATION REQUIRED.
+    
+    - **candidate_id**: ID of existing candidate
+    - **job_id**: ID of job to associate candidate with
+    """
+    try:
+        from app.models.job import Job
+        from app.models.candidate import Candidate, JobApplication, ApplicationStatus
+        
+        user_customer_id = current_user.get("customer_id")
+        
+        logger.info(f"Associating candidate {candidate_id} with job {job_id} by HR: {current_user.get('email')}")
+        
+        # 1. Get and validate candidate
+        candidate = await Candidate.get(candidate_id)
         if not candidate:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No applications found for this email address"
+                detail="Candidate not found"
             )
         
-        # Get job details for each application
-        applications_with_details = []
+        # 2. Get and validate job
+        job = await Job.get(job_id)
+        if not job:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Job not found"
+            )
         
+        # 3. Verify job belongs to current user's company
+        if str(job.customer_id.ref.id) != str(user_customer_id.id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Can only associate candidates with your company's jobs"
+            )
+        
+        # 4. Check if candidate already applied to this job
         for app in candidate.applications:
-            job = await Job.get(app.job_id)
-            if job:
-                applications_with_details.append({
-                    "job_title": job.title,
-                    "company": str(job.customer_id),  # In production, fetch company name
-                    "application_date": app.application_date.isoformat(),
-                    "status": app.status,
-                    "matching_score": app.matching_score if app.matching_score > 0 else None,
-                    "last_update": app.application_date.isoformat(),
-                    "notes": "Application under review" if app.status == "applied" else None
-                })
+            if app.job_id == job_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Candidate is already associated with this job"
+                )
         
-        return ApplicationStatusResponse(
-            email=candidate.personal_info.email,
-            total_applications=candidate.total_applications,
-            applications=applications_with_details,
-            summary={
-                "candidate_name": candidate.personal_info.name,
-                "profile_status": candidate.status,
-                "status": "success"
-            }
+        # 5. Create job application
+        job_application = JobApplication(
+            job_id=job_id,
+            application_date=datetime.utcnow(),
+            status=ApplicationStatus.APPLIED,
+            matching_score=0.0,  # VLM will calculate this
+            notes=f"Associated by HR user {current_user.get('email')} with job: {job.title}"
         )
+        
+        # 6. Add application to candidate
+        candidate.applications.append(job_application)
+        candidate.total_applications += 1
+        await candidate.save()
+        
+        # 7. Update job application count
+        await job.inc({"application_count": 1})
+        
+        logger.info(f"Candidate-job association successful - Candidate: {candidate_id}, Job: {job.title}")
+        
+        return {
+            "status": "success",
+            "message": f"Candidate successfully associated with job: {job.title}",
+            "association_details": {
+                "candidate_id": candidate_id,
+                "job_id": job_id,
+                "job_title": job.title,
+                "association_date": datetime.utcnow().isoformat(),
+                "associated_by": current_user.get("email")
+            }
+        }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to check application status for {candidate_email}: {e}")
+        logger.error(f"Candidate-job association failed - Candidate: {candidate_id}, Job: {job_id}, Error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to check application status"
+            detail="Failed to associate candidate with job"
         )
 
 # ========================== INTERNAL CANDIDATE MANAGEMENT (AUTHENTICATED) ==========================

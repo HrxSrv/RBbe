@@ -12,16 +12,15 @@ TalentHub is a comprehensive HR management platform designed to streamline recru
 - **Candidate Tracking**: Manage candidate profiles, applications, and interview processes
 - **Analytics Dashboard**: Visualize recruitment metrics and talent acquisition insights
 - **AI-Powered Chat**: Communicate with team members and candidates through an intelligent chat interface
-- **Voice Capabilities**: Text-to-speech and speech-to-text functionality for accessibility and convenience
 - **User Authentication**: Secure login and registration system
 - **Responsive Design**: Fully responsive interface that works on desktop and mobile devices
 
 ## Technologies Used
 
-- **Frontend**: Next.js 14, React, TypeScript
+- **Frontend**: Next.js 14, TypeScript
 - **Styling**: Tailwind CSS, shadcn/ui components
 - **Charts**: Recharts for data visualization
-- **Authentication**: Built-in authentication system
+- **Authentication**: Built-in authentication system + Google Oauth
 - **AI Services**: Integration with speech-to-text and text-to-speech APIs
 - **Deployment**: Vercel-ready configuration
 
@@ -56,23 +55,6 @@ TalentHub is a comprehensive HR management platform designed to streamline recru
 
 4. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
    
-5. Backend to be run on port 2900. to run it enter the below comand inthe terminal
-
-- Create a virtual end (Optional)
-```bash
-python -m venv venv
-source venv/bin/activate 
-#   On Windows: venv\Scripts\activate
-```
-
-- Install dependencies
-```bash
-pip install -r requirements.txt
-```
-- Run the backend
-```bash
-uvicorn main:app --port 2900 --reload
-```
 
 ## Project Structure
 
@@ -124,19 +106,6 @@ The main dashboard provides a comprehensive overview of:
 - Source effectiveness analysis
 - Custom report generation
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgments
 
@@ -145,5 +114,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Icons from [Lucide React](https://lucide.dev/)
 
 ---
-
-© 2025 Blackstocks. All rights reserved.

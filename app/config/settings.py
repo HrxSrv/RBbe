@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # Gemini AI settings
     gemini_api_key: str = ""  # Optional - for VLM integration
     
+    # Opik tracking settings
+    opik_api_key: str = ""  # Optional - for LLM tracking
+    opik_workspace: str = ""  # Optional - Opik workspace
+    opik_project_name: str = "resume-analysis"  # Default project name
+    
     @property
     def google_redirect_uri(self) -> str:
         return f"{self.base_url}{self.google_oauth_redirect_path}"

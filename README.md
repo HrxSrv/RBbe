@@ -1,18 +1,19 @@
 # RecruitBot - Smart Candidate Hiring Platform
 
-Platform for smart candidate hiring with AI-powered resume analysis and automated call scheduling.
+**✅ SYSTEM STATUS: READY FOR FULL PIPELINE TESTING**
+
+Platform for smart candidate hiring with AI-powered resume analysis and automated call scheduling. **Complete pipeline implemented and ready for testing**: HR uploads candidate resume → text extraction → Gemini analysis → call scheduling.
 
 ## 🎯 Project Overview
 
-**⚠️ MAJOR ARCHITECTURE CHANGE: Internal HR Tool Only**
-
-**RecruitBot** has been transformed into an **internal HR tool** that combines:
+RecruitBot is an **internal HR tool** that combines:
 - **Company Management** - Customer onboarding and team management
-- **Internal Job Management** - HR-only access to job postings with full question visibility
+- **Internal Job Management** - HR-only access to job postings with full question visibility  
 - **HR Resume Upload System** - HR uploads candidate resumes with optional candidate info
 - **Resume Analysis** - VLM-powered resume evaluation and candidate matching
 - **Upload Tracking & Audit** - Complete audit trail of who uploaded each candidate
-- **Automated Calling** - VAPI integration for scheduled candidate interviews
+- **Call Scheduling System** - Automated call scheduling with VAPI integration points
+- **Prompt Management** - Database-driven prompt system for AI customization
 - **Analytics Dashboard** - Performance metrics and hiring insights
 
 ## 🏗️ Architecture
@@ -21,11 +22,29 @@ Platform for smart candidate hiring with AI-powered resume analysis and automate
 - **MongoDB Atlas** - Cloud NoSQL database with Beanie ODM
 - **Beanie ODM** - Async MongoDB ODM with Pydantic v2 integration
 - **Google OAuth 2.0** - Authentication system with JWT tokens
-- **VLM Integration** - Resume analysis and candidate scoring
-- **VAPI** - Voice AI for automated candidate calls
+- **Gemini VLM Integration** - Resume analysis and candidate scoring
+- **VAPI Integration Points** - Voice AI for automated candidate calls
+- **Prompt Management System** - Database-driven prompt customization
 - **Pydantic v2** - Type-safe data validation and serialization
 
 ## 📊 Current Development Status
+
+### ✅ **COMPLETE PIPELINE READY FOR TESTING**
+
+**🚀 ALL PIPELINE COMPONENTS IMPLEMENTED:**
+1. ✅ **Authentication & RBAC** - Google OAuth + JWT with 4-tier role system
+2. ✅ **Job Management** - Internal dev endpoints with full question access
+3. ✅ **Resume Upload System** - HR uploads with optional candidate fields
+4. ✅ **Text Extraction Service** - Multi-format processing (PDF, DOC, DOCX)
+5. ✅ **Gemini VLM Analysis** - Intelligent resume analysis with job context
+6. ✅ **Call Scheduling System** - NEW: Complete call management with VAPI integration
+7. ✅ **Prompt Management System** - Database-driven prompt customization
+
+**🆕 LATEST ADDITIONS:**
+- ✅ **Call Scheduling Endpoints** - `/calls/schedule`, `/calls/`, `/calls/{id}`
+- ✅ **Pipeline Test Endpoint** - `/test-complete-pipeline` for comprehensive testing
+- ✅ **Prompt Management** - Complete CRUD system for AI prompt customization
+- ✅ **Upload Tracking** - Full audit trail with `uploaded_by` and `upload_source`
 
 ### ✅ **Day 1 - Foundation, Authentication & RBAC** (100% COMPLETED)
 
@@ -35,6 +54,7 @@ Platform for smart candidate hiring with AI-powered resume analysis and automate
 - ✅ Job model (job postings with requirements, salary, location)
 - ✅ Candidate model (resume analysis, application tracking)
 - ✅ Call model (VAPI call scheduling and results)
+- ✅ Prompt model (database-driven prompt system)
 - ✅ All models with proper timestamp fields and Beanie ODM integration
 
 **Infrastructure:**
@@ -65,12 +85,6 @@ Platform for smart candidate hiring with AI-powered resume analysis and automate
 - ✅ Role assignment during invitation (Recruiter/Viewer)
 - ✅ Company-scoped user operations and listing
 - ✅ User deactivation (admin-only)
-
-**API Endpoints:**
-- ✅ Health check and database testing
-- ✅ Comprehensive Day 1 feature testing endpoint
-- ✅ Sample data creation for all models
-- ✅ Protected user management endpoints
 
 ### ✅ **Day 2: Enhanced Job Management + Q&A System** (100% COMPLETED)
 
@@ -110,159 +124,29 @@ Platform for smart candidate hiring with AI-powered resume analysis and automate
 - ✅ Company-level job statistics and insights
 
 **🚨 UPDATED: Internal Job Management Workflow:**
-- ⚠️ **REMOVED**: `GET /jobs/public/list` - No longer available ❌
-- ⚠️ **REMOVED**: `GET /jobs/public/{id}` - No longer available ❌
 - ✅ **NEW**: Internal job listing endpoints (`/jobs/dev/list` - auth required)
 - ✅ **NEW**: Internal job detail view endpoint (`/jobs/dev/{id}` - auth required)
 - ✅ **Enhanced**: Full access to interview questions including ideal answers for internal users
 - ✅ Advanced filtering for internal job management (location, type, remote)
 - ✅ HR-focused browsing with authentication and customer isolation
 
-**Integration Preparations:**
-- ✅ Job-to-candidate matching algorithm foundation (TODO comments ready)
-- ✅ VLM integration points prepared for Q&A analysis
-- ✅ VAPI call scheduling integration points with Q&A questions
-- ✅ Answer scoring and analysis framework complete
-
-**jobs** - Job postings with interview questions
-```javascript
-{
-  "_id": ObjectId,
-  "customer_id": Link[Customer],
-  "created_by": Link[User],
-  "title": "Senior Python Developer",
-  "description": "Job description...",
-  "requirements": ["Python", "FastAPI", "MongoDB"],
-  "location": "San Francisco, CA",
-  
-  // Enhanced: Interview Questions
-  "questions": [
-    {
-      "question": "What is your experience with FastAPI?",
-      "ideal_answer": "I have 3+ years experience building REST APIs with FastAPI, including authentication, database integration, and async operations.",
-      "weight": 1.5
-    },
-    {
-      "question": "How do you handle database optimization?",
-      "ideal_answer": "I use indexing strategies, query optimization, connection pooling, and caching mechanisms like Redis for performance.",
-      "weight": 1.0
-    }
-  ],
-  
-  "salary_range": {
-    "min_salary": 120000,
-    "max_salary": 160000,
-    "currency": "USD"
-  },
-  "job_type": "full_time", // full_time, part_time, contract, internship
-  "status": "active", // draft, active, paused, closed
-  "department": "Engineering",
-  "experience_level": "senior",
-  "remote_allowed": true,
-  "application_deadline": datetime,
-  "view_count": 0,
-  "application_count": 0,
-  "created_at": datetime,
-  "updated_at": datetime
-}
-```
-
-**candidates** - Candidate profiles with Q&A data
-```javascript
-{
-  "_id": ObjectId,
-  "personal_info": {
-    "name": "Alice Johnson",
-    "email": "alice@example.com",
-    "phone": "+1-555-0123",
-    "location": "New York, NY"
-  },
-  "resume_analysis": {
-    "skills": ["Python", "FastAPI", "React"],
-    "experience_years": 6,
-    "education": "BS Computer Science",
-    "previous_roles": ["Senior Engineer"],
-    "matching_score": 87.5,
-    "analysis_summary": "Strong technical background...",
-    "resume_file_path": "/uploads/resumes/alice.pdf"
-  },
-  "applications": [
-    {
-      "job_id": "job_objectid",
-      "application_date": datetime,
-      "status": "applied", // applied, screening, interview, rejected, hired
-      "matching_score": 87.5,
-      "notes": "Strong candidate",
-      
-      // Enhanced: Call Q&A Data
-      "call_qa": {
-        "call_id": "call_456",
-        "call_date": datetime,
-        "questions_answers": [
-          {
-            "question": "What is your experience with FastAPI?",
-            "answer": "I have been working with FastAPI for about 4 years, primarily building microservices...",
-            "ideal_answer": "I have 3+ years experience building REST APIs with FastAPI...",
-            "score": 92.5,
-            "analysis": "Excellent answer that exceeds the ideal response with specific technical details."
-          }
-        ],
-        "overall_score": 88.7,
-        "interview_summary": "Candidate demonstrates strong technical skills with excellent FastAPI knowledge.",
-        "call_duration_minutes": 35
-      }
-    }
-  ],
-  "total_applications": 1,
-  "status": "active", // active, hired, inactive
-  "created_at": datetime,
-  "updated_at": datetime
-}
-```
-
-**calls** - VAPI call scheduling and tracking
-```javascript
-{
-  "_id": ObjectId,
-  "candidate_id": Link[Candidate],
-  "job_id": Link[Job],
-  "customer_id": Link[Customer],
-  "scheduled_time": datetime,
-  "call_type": "screening", // screening, interview, follow_up
-  "status": "scheduled", // scheduled, in_progress, completed, cancelled, no_show, failed
-  "vapi_call_id": "vapi_call_123",
-  "vapi_assistant_id": "assistant_456",
-  "call_duration": 1800, // seconds
-  "call_summary": "Positive screening call",
-  "call_transcript": "Full call transcript...",
-  "call_recording_url": "https://recordings.vapi.ai/...",
-  "candidate_score": 78.5,
-  "interviewer_notes": "Strong technical skills",
-  "next_steps": "Schedule technical interview",
-  "scheduled_by": "user_id",
-  "rescheduled_count": 0,
-  "created_at": datetime,
-  "updated_at": datetime
-}
-```
-
 ### ✅ **Day 3: Resume Processing & VLM Integration** (100% COMPLETED)
 
-**Complete Resume-to-VLM Workflow with Public Job Application System**
+**Complete Resume-to-VLM Workflow with Internal HR Upload System**
 
 #### **✅ Core Infrastructure Implementation**:
 - ✅ **File Upload Infrastructure** - Secure multipart upload with validation
 - ✅ **Text Extraction Service** - Multi-format processing (PDF, DOC, DOCX) 
 - ✅ **Gemini VLM Integration** - Intelligent resume analysis with job context
-- ✅ **Public Job Application System** - Seamless candidate experience without authentication
-- ✅ **Internal Candidate Management** - Comprehensive company tools with RBAC
+- ✅ **Internal HR Upload System** - Authentication-required HR tool for candidate management
+- ✅ **Complete Internal Management** - Comprehensive company tools with RBAC
 
 #### **✅ Step 1: File Upload System** - COMPLETED
 - ✅ Secure file upload with MIME type validation (PDF, DOC, DOCX)
 - ✅ File size limits and security checks (10MB max)
 - ✅ Organized storage structure (`uploads/resumes/{customer_id}/{candidate_id}/`)
 - ✅ Complete file lifecycle management (upload, metadata, cleanup)
-- ✅ Public and internal endpoint architecture
+- ✅ Internal HR authentication-only architecture
 - ✅ Automatic customer ID association from job context
 
 #### **✅ Step 2: Text Extraction Service** - COMPLETED  
@@ -283,56 +167,88 @@ Platform for smart candidate hiring with AI-powered resume analysis and automate
 - ✅ **Structured output**: Consistent JSON parsing with comprehensive error handling
 - ✅ **Cost optimization**: Smart routing for efficient API usage
 
-#### **🚨 UPDATED: Step 4: HR Resume Upload System** - CONVERTED TO INTERNAL
-- ⚠️ **REMOVED**: `/candidates/public/apply-to-job/{job_id}` - No longer available ❌
-- ⚠️ **REMOVED**: `/candidates/public/application-status/{email}` - No longer available ❌
-- ✅ **NEW HR Endpoints**: `/candidates/upload-resume-for-job/{job_id}`, `/candidates/upload-resume`, `/candidates/{id}/associate-job/{job_id}`
-- ✅ **Internal Endpoints**: `/candidates/`, `/candidates/{id}`, `/candidates/analyze-resume/{id}`, etc.
+#### **✅ Step 4: Internal HR Upload System** - COMPLETED
+- ✅ **HR Upload Endpoints**: `/candidates/upload-resume-for-job/{job_id}`, `/candidates/upload-resume`, `/candidates/{id}/associate-job/{job_id}`
+- ✅ **Internal Management**: `/candidates/`, `/candidates/{id}`, `/candidates/analyze-resume/{id}`, etc.
 - ✅ **Data Flow**: HR Login → Upload Resume → Customer ID → File Storage → Candidate Profile
 - ✅ **Security**: Universal authentication requirement with proper RBAC integration
 - ✅ **Upload Tracking**: Complete audit trail with `uploaded_by` and `upload_source` fields
 - ✅ **Optional Fields**: VLM-ready system with "To be extracted by VLM" placeholders
 
-#### **✅ Integration Architecture**:
-- ✅ **Public Application Flow**: Job browsing → Resume upload → VLM analysis → Profile creation
-- ✅ **Internal Management Flow**: Company login → Candidate review → Status updates → Analysis triggers
-- ✅ **Day 2 Integration**: Job questions system fully integrated for Q&A assessment
-- ✅ **Day 4 Ready**: Complete candidate-to-company workflow prepared
+### 🆕 **Pipeline Completion: Call Scheduling & Prompt Management** (NEW)
+
+#### **✅ Call Scheduling System** - COMPLETED
+- ✅ **Complete Call Management**: Schedule, list, view, update call status
+- ✅ **VAPI Integration Points**: Ready for voice AI integration
+- ✅ **Call Data Model**: Comprehensive tracking with candidate/job context
+- ✅ **Analytics Ready**: Performance metrics and success tracking
+- ✅ **Reschedule Support**: Call rescheduling with history tracking
+
+#### **✅ Prompt Management System** - COMPLETED
+- ✅ **Database-driven Prompts**: 5 prompt types (VAPI_INTERVIEW, VAPI_FIRST_MESSAGE, GEMINI_RESUME_TEXT, etc.)
+- ✅ **Complete CRUD API**: Create, read, update, delete prompts with versioning
+- ✅ **Customer-specific Overrides**: Company-specific prompt customization
+- ✅ **Variable Mapping**: Dynamic prompt variables for personalization
+- ✅ **Usage Tracking**: Analytics on prompt performance and usage
+- ✅ **Fallback System**: Default prompts with customer overrides
+
+#### **✅ Pipeline Test System** - COMPLETED
+- ✅ **Complete Pipeline Test**: `/test-complete-pipeline` endpoint
+- ✅ **Component Validation**: Tests all 6 pipeline components
+- ✅ **Integration Verification**: End-to-end workflow validation
+- ✅ **Frontend Integration Guide**: Complete API usage documentation
 
 **API Endpoints Implemented:**
 ```bash
-# PUBLIC (No Authentication) - For Job Seekers
-POST   /api/v1/candidates/public/apply-to-job/{job_id}    # Apply to job with resume
-GET    /api/v1/candidates/public/application-status/{email} # Check application status
+# INTERNAL AUTHENTICATION-REQUIRED SYSTEM
+# Job Management
+GET    /api/v1/jobs/dev/list                           # Internal job listing
+GET    /api/v1/jobs/dev/{job_id}                       # Internal job details
 
-# INTERNAL (Authentication Required) - For Companies  
-GET    /api/v1/candidates/                                # List company candidates
-GET    /api/v1/candidates/{id}                            # Get candidate details
-PUT    /api/v1/candidates/{id}/status                     # Update application status
-POST   /api/v1/candidates/analyze-resume/{id}             # Trigger VLM analysis
-POST   /api/v1/candidates/qa-assessment/{id}              # Q&A readiness evaluation
-POST   /api/v1/candidates/batch-analyze                   # Bulk candidate processing
-GET    /api/v1/candidates/files/{id}/metadata             # File metadata retrieval
-DELETE /api/v1/candidates/files/{id}                      # File deletion with cleanup
+# HR Resume Upload
+POST   /api/v1/candidates/upload-resume-for-job/{job_id}   # Upload for specific job
+POST   /api/v1/candidates/upload-resume                    # Upload to general pool
+POST   /api/v1/candidates/{id}/associate-job/{job_id}      # Associate with job
+
+# Candidate Management
+GET    /api/v1/candidates/                              # List company candidates
+GET    /api/v1/candidates/{id}                          # Get candidate details
+PUT    /api/v1/candidates/{id}/status                   # Update application status
+POST   /api/v1/candidates/analyze-resume/{id}           # Trigger VLM analysis
+POST   /api/v1/candidates/qa-assessment/{id}            # Q&A readiness evaluation
+
+# 🆕 Call Scheduling (NEW)
+POST   /api/v1/calls/schedule                          # Schedule call
+GET    /api/v1/calls/                                  # List calls with filtering
+GET    /api/v1/calls/{call_id}                         # Get call details
+PUT    /api/v1/calls/{call_id}/status                  # Update call status
+
+# 🆕 Prompt Management (NEW)
+GET    /api/v1/prompts/                                # List prompts
+POST   /api/v1/prompts/                                # Create prompt
+GET    /api/v1/prompts/{prompt_id}                     # Get prompt details
+PUT    /api/v1/prompts/{prompt_id}                     # Update prompt
 
 # Testing & Validation
-GET    /api/v1/test-day3-step1-file-upload                # File upload validation
-GET    /api/v1/test-day3-step2-text-extraction            # Text extraction validation  
-GET    /api/v1/test-day3-step3-gemini-integration         # VLM integration validation
-POST   /api/v1/test-day3-complete-fixed                   # Complete architecture test
+POST   /api/v1/test-complete-pipeline                  # 🆕 Complete pipeline test
+GET    /api/v1/test-day3-step1-file-upload             # File upload validation
+GET    /api/v1/test-day3-step2-text-extraction         # Text extraction validation  
+GET    /api/v1/test-day3-step3-gemini-integration      # VLM integration validation
 ```
 
 **Technical Implementation Highlights:**
-- **Dual endpoint architecture**: Seamless separation of public and internal workflows
+- **Internal HR tool architecture**: All operations require authentication
 - **Multi-model VLM strategy** for cost-effective processing
 - **Smart routing logic** based on text extraction confidence (<0.7 triggers vision)
 - **Enhanced Q&A integration** with Day 2 job questions system
 - **Robust error handling** with graceful degradation and detailed logging
 - **RBAC security** throughout all internal operations
 - **Customer data isolation** with automatic job-to-company association
-- **Optimized user experience**: Frictionless candidate job applications
+- **Upload tracking and audit trail** for compliance and monitoring
+- **Complete call scheduling workflow** ready for VAPI integration
+- **Database-driven prompt management** for AI customization
 
-**Day 3 Status**: COMPLETE AND PRODUCTION READY
+**Pipeline Status**: COMPLETE AND READY FOR FRONTEND TESTING
 
 ## 🚀 Quick Start
 
@@ -372,6 +288,9 @@ GOOGLE_CLIENT_SECRET=your-client-secret
 
 # JWT Security
 JWT_SECRET_KEY=your-32-character-secret-key
+
+# Gemini API
+GEMINI_API_KEY=your-gemini-api-key
 ```
 
 ### Run Development Server
@@ -384,206 +303,120 @@ uv run run.py dev
 curl http://localhost:8000/api/v1/health
 ```
 
-## 🧪 Testing the System
+## 🧪 Testing the Complete Pipeline
 
-### Test Day 1 Completion
+### 🆕 Test Complete Pipeline (NEW)
 ```bash
+# Test the complete pipeline functionality
+curl -X POST -H "Authorization: Bearer $ACCESS_TOKEN" \
+  http://localhost:8000/api/v1/test-complete-pipeline
+```
+
+This comprehensive test validates:
+- ✅ **Data Verification**: Customer, user, job models and relationships
+- ✅ **File Upload**: Secure multipart upload with validation 
+- ✅ **Text Extraction**: Multi-format processing with quality assessment
+- ✅ **Gemini Analysis**: VLM integration with job context
+- ✅ **Call Scheduling**: Complete call management system
+- ✅ **Prompt System**: Database-driven prompt management
+- ✅ **Authentication**: JWT token validation throughout
+- ✅ **RBAC**: Role-based access control verification
+- ✅ **Frontend Integration**: Complete API usage guide
+
+### Manual Testing with Real Resume
+```bash
+# 1. Create sample data
+curl -X POST http://localhost:8000/api/v1/create-sample-data
+
+# 2. Get authentication token (replace with your Google OAuth flow)
+# ACCESS_TOKEN=your_jwt_token_here
+
+# 3. List available jobs
+curl -H "Authorization: Bearer $ACCESS_TOKEN" \
+  http://localhost:8000/api/v1/jobs/dev/list
+
+# 4. Upload real resume for specific job
+curl -X POST -H "Authorization: Bearer $ACCESS_TOKEN" \
+  http://localhost:8000/api/v1/candidates/upload-resume-for-job/YOUR_JOB_ID \
+  -F "resume=@sampleresume.pdf" \
+  -F "candidate_name=Test Candidate" \
+  -F "candidate_email=test@example.com"
+
+# 5. Trigger analysis (automatic during upload, but can be re-run)
+curl -X POST -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:8000/api/v1/candidates/analyze-resume/CANDIDATE_ID \
+  -d '{"job_id": "YOUR_JOB_ID"}'
+
+# 6. Schedule call
+curl -X POST -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:8000/api/v1/calls/schedule \
+  -d '{
+    "candidate_id": "CANDIDATE_ID",
+    "job_id": "YOUR_JOB_ID", 
+    "scheduled_time": "2024-01-15T10:00:00Z",
+    "call_type": "screening"
+  }'
+```
+
+### Test Individual Components
+```bash
+# Test Day 1 RBAC system
 curl http://localhost:8000/api/v1/test-day1-features
-```
 
-This comprehensive test validates:
-- ✅ RBAC system with 27 permissions across 4 roles
-- ✅ Permission hierarchy and role validation
-- ✅ Database models and relationships
-- ✅ Router integration and endpoint availability
-
-### Test Day 2 Enhanced Features
-```bash
+# Test Day 2 job management with Q&A
 curl -X POST http://localhost:8000/api/v1/test-day2-enhanced-features
-```
 
-This comprehensive test validates:
-- ✅ Job questions schema validation and structure
-- ✅ Candidate QA framework validation
-- ✅ Integration readiness for Day 3 (VLM) and Day 4-5 (VAPI)
-- ✅ Complete schema hierarchy for Q&A data
-
-### Test Day 3 Implementation
-```bash
-# Test complete Day 3 implementation
-curl -X POST http://localhost:8000/api/v1/test-day3-complete-fixed
-
-# Test individual Day 3 components
-curl -X GET http://localhost:8000/api/v1/test-day3-step1-file-upload
-curl -X GET http://localhost:8000/api/v1/test-day3-step2-text-extraction
+# Test Day 3 VLM integration
 curl -X GET http://localhost:8000/api/v1/test-day3-step3-gemini-integration
-```
 
-### 🆕 Test Internal Tool Architecture
-```bash
-# Test the complete architectural transformation
+# Test internal tool architecture
 curl -X GET http://localhost:8000/api/v1/test-internal-tool-architecture
 ```
 
-This comprehensive test validates:
-- ✅ **Architecture transformation**: Conversion from public platform to internal HR tool
-- ✅ **Endpoint changes**: Public endpoints removed, internal dev endpoints added
-- ✅ **Authentication requirements**: All operations require valid JWT tokens
-- ✅ **Upload system**: HR resume upload with optional field handling
-- ✅ **Tracking fields**: Upload audit trail with `uploaded_by` and `upload_source`
-- ✅ **Customer isolation**: Proper data filtering and RBAC integration
-
-### 🚨 UPDATED: Test HR Resume Upload System
-```bash
-# ⚠️ UPDATED: HR upload system (auth required)
-curl -X POST -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8000/api/v1/candidates/upload-resume-for-job/{job_id} \
-  -F "resume=@resume.pdf" \
-  -F "candidate_name=John Doe" \
-  -F "candidate_email=john@example.com" \
-  -F "candidate_phone=+1-555-0123" \
-  -F "candidate_location=New York, NY"
-
-# Upload to general candidate pool
-curl -X POST -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8000/api/v1/candidates/upload-resume \
-  -F "resume=@resume.pdf" \
-  -F "candidate_name=Jane Smith"
-
-# Associate existing candidate with job
-curl -X POST -H "Authorization: Bearer $ACCESS_TOKEN" http://localhost:8000/api/v1/candidates/{candidate_id}/associate-job/{job_id}
-```
-
-This comprehensive test validates:
-- ✅ **HR resume upload system**: Authenticated HR tool for candidate management
-- ✅ File upload infrastructure with security validation
-- ✅ Multi-format text extraction (PDF, DOC, DOCX) with quality assessment
-- ✅ Gemini VLM service integration with dual-model strategy
-- ✅ Job context-aware resume analysis and Q&A readiness assessment
-- ✅ Internal authentication-only architecture with proper RBAC
-- ✅ Upload tracking and audit trail with `uploaded_by` field
-- ✅ Optional field system with VLM-ready placeholders
-- ✅ Customer data isolation and proper job association
-- ✅ Complete internal HR workflow for production use
-
-### Test Job Creation with Questions
-```bash
-curl -X POST http://localhost:8000/api/v1/jobs/ \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -d '{
-    "title": "Senior Python Developer with Q&A",
-    "description": "Looking for experienced Python developer - Enhanced with interview questions",
-    "requirements": ["Python", "FastAPI", "MongoDB"],
-    "location": "San Francisco, CA",
-    "job_type": "full_time",
-    "questions": [
-      {
-        "question": "What is your experience with FastAPI?",
-        "ideal_answer": "I have 3+ years experience building REST APIs with FastAPI, including authentication, database integration, and async operations.",
-        "weight": 1.5
-      },
-      {
-        "question": "How do you handle database optimization?",
-        "ideal_answer": "I use indexing strategies, query optimization, connection pooling, and caching mechanisms like Redis for performance.",
-        "weight": 1.0
-      }
-    ]
-  }'
-```
-
-### Test Customer Registration
-```bash
-curl -X POST http://localhost:8000/api/v1/customers/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "company_name": "NewTech Corp",
-    "email": "admin@newtech.com",
-    "website": "https://newtech.com",
-    "industry": "SaaS",
-    "company_size": "10-50"
-  }'
-```
-
-### Test Database Connection
-```bash
-curl http://localhost:8000/api/v1/test-db
-```
-
-### Create Sample Data
-```bash
-curl -X POST http://localhost:8000/api/v1/create-sample-data
-```
-
-This creates a complete data set:
-- **1 Customer:** TechCorp Solutions (Professional plan)
-- **2 Users:** John Admin (company_admin) + Jane Recruiter (recruiter)
-- **1 Job:** Senior Python Developer ($120K-$160K, Remote allowed)
-- **1 Candidate:** Alice Johnson (87.5% match, 6 years experience)
-- **1 Call:** Scheduled screening call (2 days from creation)
-
-### Test RBAC System
-```bash
-# This endpoint shows permission counts per role:
-# Super Admin: 27 permissions
-# Company Admin: 23 permissions  
-# Recruiter: 14 permissions
-# Viewer: 6 permissions
-curl http://localhost:8000/api/v1/test-day1-features | jq '.rbac_system'
-```
-
-### Verify in MongoDB Atlas
-Check your database collections:
-- `customers` - Company data with subscription plans
-- `users` - Team members with role-based access
-- `jobs` - Job postings with requirements and salary ranges
-- `candidates` - Candidate profiles with resume analysis
-- `calls` - Scheduled calls with VAPI integration points
-
 ## 📚 API Documentation
 
-### Current Endpoints
+### 🆕 Pipeline Endpoints (Ready for Frontend)
 
-**Authentication:**
-- `POST /api/v1/auth/google` - Google OAuth login
-- `GET /api/v1/auth/validate` - Validate JWT token
-- `POST /api/v1/auth/logout` - User logout
+**Authentication Flow:**
+```bash
+GET    /api/v1/auth/google              # Initiate Google OAuth
+GET    /api/v1/auth/me                  # Get current user info
+POST   /api/v1/auth/logout              # Logout user
+```
 
-**Customer Management:**
-- `POST /api/v1/customers/register` - Public company registration
-- `GET /api/v1/customers/` - List customers (admin only)
-- `GET /api/v1/customers/{id}` - Get customer details
-- `PUT /api/v1/customers/{id}` - Update customer details
-- `DELETE /api/v1/customers/{id}` - Deactivate customer (super admin)
+**Complete HR Workflow:**
+```bash
+# 1. Job Management
+GET    /api/v1/jobs/dev/list            # List company jobs
+GET    /api/v1/jobs/dev/{job_id}        # Get job with questions
 
-**User Management:**
-- `GET /api/v1/users/me` - Get current user profile
-- `GET /api/v1/users/` - List company users (role-filtered)
-- `GET /api/v1/users/{id}` - Get user details
-- `PUT /api/v1/users/{id}/deactivate` - Deactivate user (admin)
+# 2. Resume Upload & Processing  
+POST   /api/v1/candidates/upload-resume-for-job/{job_id}  # Upload resume
+GET    /api/v1/candidates/{id}                            # View candidate
 
-**Invitations:**
-- `POST /api/v1/invitations/invite` - Invite team member (admin/company_admin)
-- `POST /api/v1/invitations/accept/{id}` - Accept invitation (public)
+# 3. Analysis & Evaluation
+POST   /api/v1/candidates/analyze-resume/{id}             # Trigger analysis
+POST   /api/v1/candidates/qa-assessment/{id}              # Q&A readiness
 
-**Job Management:**
-- `POST /api/v1/jobs/` - Create job posting (recruiter+)
-- `GET /api/v1/jobs/` - List jobs with filtering and pagination (recruiter+)
-- `GET /api/v1/jobs/{id}` - Get job details with view tracking (recruiter+)
-- `PUT /api/v1/jobs/{id}` - Update job details (recruiter+)
-- `DELETE /api/v1/jobs/{id}` - Archive job (soft delete) (recruiter+)
-- `POST /api/v1/jobs/{id}/publish` - Publish job (draft → active) (recruiter+)
-- `GET /api/v1/jobs/analytics/summary` - Job analytics and metrics (recruiter+)
+# 4. Call Scheduling
+POST   /api/v1/calls/schedule           # Schedule interview
+GET    /api/v1/calls/                   # List scheduled calls
+GET    /api/v1/calls/{call_id}          # Get call details
 
-**Public Job Endpoints (No Authentication):**
-- `GET /api/v1/jobs/public/list` - Browse active jobs (public)
-- `GET /api/v1/jobs/public/{id}` - View job details (public)
+# 5. Prompt Management
+GET    /api/v1/prompts/                 # List prompts  
+POST   /api/v1/prompts/                 # Create custom prompt
+PUT    /api/v1/prompts/{id}             # Update prompt
+```
 
 **System & Testing:**
-- `GET /api/v1/health` - Health check
-- `GET /api/v1/test-db` - Database connection test
-- `GET /api/v1/test-day1-features` - Comprehensive Day 1 functionality test
-- `GET /api/v1/test-day2-features` - Comprehensive Day 2 job management test
-- `POST /api/v1/test-day2-enhanced-features` - Enhanced Day 2 Q&A system test
-- `POST /api/v1/create-sample-data` - Create test data
+```bash
+GET    /api/v1/health                   # Health check
+POST   /api/v1/create-sample-data       # Create test data
+POST   /api/v1/test-complete-pipeline   # 🆕 Test complete system
+```
 
 **Interactive Documentation:**
 - Swagger UI: `http://localhost:8000/docs`
@@ -606,71 +439,81 @@ app/
 │   ├── routes.py          # Main API router
 │   └── endpoints/
 │       ├── auth.py        # Authentication endpoints
-│       └── users.py       # User management
+│       ├── users.py       # User management
+│       ├── jobs.py        # Job management
+│       ├── candidates.py  # Candidate & resume processing
+│       ├── calls.py       # 🆕 Call scheduling (NEW)
+│       └── prompts.py     # 🆕 Prompt management (NEW)
 ├── models/                 # Beanie document models
 │   ├── __init__.py        # Model imports & rebuilding
 │   ├── customer.py        # Customer/Company model
 │   ├── user.py           # User model with roles
 │   ├── job.py            # Job posting model
 │   ├── candidate.py      # Candidate profile model
-│   └── call.py           # Call scheduling model
+│   ├── call.py           # Call scheduling model
+│   └── prompt.py         # 🆕 Prompt model (NEW)
 ├── schemas/               # Pydantic request/response schemas
 │   └── schemas.py
 └── services/              # Business logic services
-    └── google_oauth.py
+    ├── google_oauth.py
+    ├── file_upload.py     # File upload & validation
+    ├── text_extraction.py # Multi-format text extraction
+    ├── gemini_service.py  # VLM integration
+    └── prompt_service.py  # 🆕 Prompt management (NEW)
 ```
 
-### Adding New Features
+### Database Collections
 
-1. **Define Model** in `app/models/`
-2. **Add to __init__.py** imports and model rebuilding
-3. **Create Schemas** in `app/schemas/`
-4. **Implement Endpoints** in `app/api/v1/endpoints/`
-5. **Register Routes** in `app/api/v1/routes.py`
-
-### Database Operations with Beanie
-
-```python
-# Create
-customer = Customer(company_name="New Company", email="test@company.com")
-await customer.save()
-
-# Find
-customer = await Customer.find_one(Customer.email == "test@company.com")
-customers = await Customer.find(Customer.is_active == True).to_list()
-
-# Update
-await customer.set({Customer.company_name: "Updated Name"})
-
-# Delete
-await customer.delete()
-```
-
-## 🚢 Deployment
-
-Ready for deployment on:
-- **Railway** - Automatic deployment from Git
-- **Docker** - Containerized deployment
-- **Any cloud provider** supporting Python apps
+**MongoDB Collections:**
+- `customers` - Company data with subscription plans
+- `users` - Team members with role-based access  
+- `jobs` - Job postings with interview questions
+- `candidates` - Candidate profiles with resume analysis and upload tracking
+- `calls` - Scheduled calls with VAPI integration points
+- `prompts` - 🆕 Database-driven prompt system (NEW)
 
 ## 🔒 Security Features
 
-- JWT token authentication
-- Role-based access control (in progress)
-- Google OAuth integration
-- Environment-based secrets management
-- CORS protection
-- Input validation with Pydantic
+- **JWT token authentication** with Google OAuth
+- **Role-based access control** with 27 granular permissions
+- **4-tier role hierarchy** (Super Admin → Company Admin → Recruiter → Viewer)
+- **Customer data isolation** - users only see their company's data
+- **Upload audit trail** - complete tracking of who uploaded each resume
+- **Environment-based secrets management**
+- **CORS protection** and input validation
+- **Secure file upload** with MIME type validation
 
 ## 🎯 Next Steps
 
-1. ✅ **Day 1 COMPLETED** - RBAC middleware and user invitation system implemented
-2. ✅ **Day 2 COMPLETED** - Job management system with Q&A framework
-3. ✅ **Day 3 COMPLETED** - Resume processing and Gemini VLM integration
-4. **Day 4** - Enhanced candidate management with VLM workflow
-5. **Day 5** - VAPI integration for automated voice interviews
-6. **Day 6** - Admin dashboard and production deployment
+1. ✅ **Day 1 COMPLETED** - Foundation, Authentication & RBAC
+2. ✅ **Day 2 COMPLETED** - Enhanced Job Management + Q&A System
+3. ✅ **Day 3 COMPLETED** - Resume Processing & VLM Integration
+4. ✅ **Pipeline COMPLETED** - Call Scheduling & Prompt Management
+5. **Frontend Development** - React/Next.js implementation of complete workflow
+6. **VAPI Integration** - Voice AI for automated interviews
+7. **Production Deployment** - Railway/Docker deployment with monitoring
+
+## 🚀 Ready for Frontend Development
+
+**✅ COMPLETE BACKEND PIPELINE:**
+- Authentication & authorization system
+- Job management with interview questions
+- Resume upload with text extraction
+- Gemini VLM analysis with job context
+- Call scheduling with VAPI integration points
+- Prompt management for AI customization
+- Complete API documentation and testing
+
+**🎯 FRONTEND PRIORITIES:**
+1. **Authentication Flow** - Google OAuth integration
+2. **HR Dashboard** - Job management and candidate overview
+3. **Resume Upload Interface** - Drag & drop with progress indicators
+4. **Candidate Review** - Analysis results and scoring display
+5. **Call Scheduling** - Calendar integration and management
+6. **Analytics Dashboard** - Performance metrics and insights
 
 ---
 
-**Current Status:** Day 3 Complete ✅ (Resume Processing & VLM Integration - Public job application system + Internal candidate management with complete VLM workflow) 
+**Current Status:** ✅ **COMPLETE PIPELINE READY FOR FRONTEND TESTING**
+**Next Step:** Frontend implementation of complete HR workflow
+**VAPI Integration:** Backend endpoints ready, voice integration pending 

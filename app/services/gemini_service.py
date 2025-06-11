@@ -6,6 +6,17 @@ from pathlib import Path
 from loguru import logger
 from fastapi import HTTPException, status
 
+# Opik integration for tracking
+try:
+    from opik import track
+    from opik import opik_context
+    from app.config.opik_config import OpikConfig
+    OPIK_AVAILABLE = True
+    logger.info("Opik tracking available for Gemini service")
+except ImportError:
+    OPIK_AVAILABLE = False
+    logger.warning("Opik not available. Install with: pip install opik")
+
 # Gemini integration
 try:
     import google.generativeai as genai
@@ -151,6 +162,7 @@ class GeminiService:
             )
     
     @classmethod
+    @track(name="gemini_resume_text_analysis", tags=["gemini", "resume", "text_analysis"])
     async def analyze_resume_text(
         cls, 
         extracted_text: str, 
@@ -166,6 +178,21 @@ class GeminiService:
             )
         
         try:
+            # Add metadata to Opik tracking
+            if OPIK_AVAILABLE:
+                try:
+                    opik_context.update_current_span(
+                        metadata={
+                            "analysis_type": "text_analysis",
+                            "text_length": len(extracted_text),
+                            "has_job_context": job_context is not None,
+                            "job_title": job_context.title if job_context else None,
+                            "model_used": cls.TEXT_MODEL
+                        }
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to update Opik span metadata: {e}")
+            
             # Initialize model
             model = genai.GenerativeModel(
                 model_name=cls.TEXT_MODEL,
@@ -173,8 +200,29 @@ class GeminiService:
                 generation_config=cls.GENERATION_CONFIG
             )
             
-            # Build analysis prompt
-            prompt = cls._build_text_analysis_prompt(extracted_text, job_context)
+            # Get prompt from database
+            from app.services.prompt_service import PromptService
+            
+            # Convert job context to dict format
+            job_context_dict = None
+            if job_context:
+                job_context_dict = {
+                    "title": job_context.title,
+                    "description": job_context.description,
+                    "requirements": job_context.requirements,
+                    "experience_level": getattr(job_context, 'experience_level', None),
+                    "location": job_context.location,
+                    "job_type": job_context.job_type
+                }
+            
+            # Get customer_id if available (assuming it's passed through job_context or can be extracted)
+            customer_id = getattr(job_context, 'customer_id', None) if job_context else None
+            
+            prompt = await PromptService.get_gemini_resume_text_prompt(
+                extracted_text, 
+                job_context_dict, 
+                customer_id
+            )
             
             # Generate analysis
             response = await cls._generate_content_async(model, prompt)
@@ -193,6 +241,7 @@ class GeminiService:
             )
     
     @classmethod
+    @track(name="gemini_resume_vision_analysis", tags=["gemini", "resume", "vision_analysis"])
     async def analyze_resume_vision(
         cls, 
         file_path: str, 
@@ -208,6 +257,21 @@ class GeminiService:
             )
         
         try:
+            # Add metadata to Opik tracking
+            if OPIK_AVAILABLE:
+                try:
+                    opik_context.update_current_span(
+                        metadata={
+                            "analysis_type": "vision_analysis",
+                            "file_path": file_path,
+                            "has_job_context": job_context is not None,
+                            "job_title": job_context.title if job_context else None,
+                            "model_used": cls.VISION_MODEL
+                        }
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to update Opik span metadata: {e}")
+            
             # Initialize vision model
             model = genai.GenerativeModel(
                 model_name=cls.VISION_MODEL,
@@ -218,8 +282,28 @@ class GeminiService:
             # Upload file for vision analysis
             file = genai.upload_file(path=file_path)
             
-            # Build vision analysis prompt
-            prompt = cls._build_vision_analysis_prompt(job_context)
+            # Get prompt from database
+            from app.services.prompt_service import PromptService
+            
+            # Convert job context to dict format
+            job_context_dict = None
+            if job_context:
+                job_context_dict = {
+                    "title": job_context.title,
+                    "description": job_context.description,
+                    "requirements": job_context.requirements,
+                    "experience_level": getattr(job_context, 'experience_level', None),
+                    "location": job_context.location,
+                    "job_type": job_context.job_type
+                }
+            
+            # Get customer_id if available
+            customer_id = getattr(job_context, 'customer_id', None) if job_context else None
+            
+            prompt = await PromptService.get_gemini_resume_vision_prompt(
+                job_context_dict, 
+                customer_id
+            )
             
             # Generate analysis with file
             response = await cls._generate_content_async(model, [prompt, file])
@@ -238,6 +322,7 @@ class GeminiService:
             )
     
     @classmethod
+    @track(name="gemini_qa_readiness_assessment", tags=["gemini", "qa", "assessment"])
     async def assess_qa_readiness(
         cls,
         resume_analysis: ResumeAnalysisResult,
@@ -256,13 +341,41 @@ class GeminiService:
             }
         
         try:
+            # Add metadata to Opik tracking
+            if OPIK_AVAILABLE:
+                try:
+                    opik_context.update_current_span(
+                        metadata={
+                            "assessment_type": "qa_readiness",
+                            "num_questions": len(job_questions),
+                            "candidate_score": resume_analysis.overall_score,
+                            "candidate_experience": resume_analysis.experience_level,
+                            "model_used": cls.TEXT_MODEL
+                        }
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to update Opik span metadata: {e}")
+            
             model = genai.GenerativeModel(
                 model_name=cls.TEXT_MODEL,
                 safety_settings=cls.SAFETY_SETTINGS,
                 generation_config=cls.GENERATION_CONFIG
             )
             
-            prompt = cls._build_qa_assessment_prompt(resume_analysis, job_questions)
+            # Get prompt from database
+            from app.services.prompt_service import PromptService
+            
+            # Convert resume analysis to dict if it's not already
+            resume_analysis_dict = resume_analysis.to_dict() if hasattr(resume_analysis, 'to_dict') else resume_analysis
+            
+            # Get customer_id if available (this might need to be passed as a parameter in the future)
+            customer_id = None  # TODO: Pass customer_id through the call chain
+            
+            prompt = await PromptService.get_gemini_qa_assessment_prompt(
+                resume_analysis_dict,
+                job_questions,
+                customer_id
+            )
             
             response = await cls._generate_content_async(model, prompt)
             
@@ -279,6 +392,7 @@ class GeminiService:
             }
     
     @classmethod
+    @track(name="gemini_complete_resume_analysis", tags=["gemini", "resume", "complete_analysis"])
     async def analyze_resume_complete(
         cls,
         extraction_result: TextExtractionResult,
@@ -289,6 +403,22 @@ class GeminiService:
         Complete resume analysis workflow with intelligent routing.
         """
         try:
+            # Add metadata to Opik tracking
+            if OPIK_AVAILABLE:
+                try:
+                    opik_context.update_current_span(
+                        metadata={
+                            "workflow_type": "complete_analysis",
+                            "extraction_confidence": extraction_result.confidence,
+                            "needs_vlm": extraction_result.needs_vlm_processing,
+                            "has_job_context": job_context is not None,
+                            "job_title": job_context.title if job_context else None,
+                            "file_path": file_path
+                        }
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to update Opik span metadata: {e}")
+            
             # Decide between text and vision analysis based on extraction quality
             if extraction_result.needs_vlm_processing or extraction_result.confidence < 0.7:
                 logger.info(f"Using Gemini Vision for complex document analysis (confidence: {extraction_result.confidence})")
@@ -505,12 +635,32 @@ Return ONLY valid JSON without additional text or markdown formatting.
         return prompt
     
     @classmethod
+    @track(type="llm", name="gemini_api_call", tags=["gemini", "api", "generation"])
     async def _generate_content_async(cls, model, prompt: Union[str, List]) -> Any:
         """
-        Generate content asynchronously with retry logic.
+        Generate content asynchronously with retry logic and Opik tracking.
         """
         max_retries = 3
         retry_delay = 1
+        
+        # Extract model name for tracking
+        model_name = getattr(model, '_model_name', 'unknown')
+        
+        # Add input information to tracking if Opik is available
+        if OPIK_AVAILABLE:
+            try:
+                opik_context.update_current_span(
+                    input={
+                        "prompt": prompt if isinstance(prompt, str) else "multimodal_prompt"
+                    },
+                    metadata={
+                        "model_name": model_name,
+                        "max_retries": max_retries,
+                        "prompt_type": "text" if isinstance(prompt, str) else "multimodal"
+                    }
+                )
+            except Exception as e:
+                logger.warning(f"Failed to update Opik span metadata: {e}")
         
         for attempt in range(max_retries):
             try:
@@ -518,14 +668,70 @@ Return ONLY valid JSON without additional text or markdown formatting.
                 response = await asyncio.get_event_loop().run_in_executor(
                     None, model.generate_content, prompt
                 )
+                
+                # Update Opik tracking with response information
+                if OPIK_AVAILABLE:
+                    try:
+                        # Extract usage metadata if available
+                        usage_metadata = None
+                        if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                            usage = response.usage_metadata
+                            usage_metadata = {
+                                "prompt_tokens": getattr(usage, 'prompt_token_count', 0),
+                                "completion_tokens": getattr(usage, 'candidates_token_count', 0),
+                                "total_tokens": getattr(usage, 'total_token_count', 0)
+                            }
+                        
+                        opik_context.update_current_span(
+                            output={
+                                "response_text": response.text if hasattr(response, 'text') else "response_generated"
+                            },
+                            provider="google_ai",
+                            model=model_name,
+                            usage=usage_metadata,
+                            metadata={
+                                "attempt": attempt + 1,
+                                "success": True,
+                                "response_candidates": len(response.candidates) if hasattr(response, 'candidates') else 1
+                            }
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to update Opik span with response data: {e}")
+                
                 return response
                 
             except Exception as e:
                 if attempt < max_retries - 1:
                     logger.warning(f"Gemini API attempt {attempt + 1} failed: {e}. Retrying in {retry_delay}s...")
+                    
+                    # Update Opik tracking with retry information
+                    if OPIK_AVAILABLE:
+                        try:
+                            opik_context.update_current_span(
+                                metadata={
+                                    "attempt": attempt + 1,
+                                    "retry_error": str(e),
+                                    "retrying": True
+                                }
+                            )
+                        except Exception as opik_e:
+                            logger.warning(f"Failed to update Opik span with retry info: {opik_e}")
+                    
                     await asyncio.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
                 else:
+                    # Update Opik tracking with final failure
+                    if OPIK_AVAILABLE:
+                        try:
+                            opik_context.update_current_span(
+                                metadata={
+                                    "attempt": attempt + 1,
+                                    "final_error": str(e),
+                                    "success": False
+                                }
+                            )
+                        except Exception as opik_e:
+                            logger.warning(f"Failed to update Opik span with error info: {opik_e}")
                     raise e
     
     @classmethod
@@ -633,6 +839,7 @@ Return ONLY valid JSON without additional text or markdown formatting.
             }
     
     @classmethod
+    @track(name="gemini_batch_resume_analysis", tags=["gemini", "batch", "resume", "analysis"])
     async def batch_analyze_resumes(
         cls,
         extraction_results: Dict[str, TextExtractionResult],
@@ -642,6 +849,21 @@ Return ONLY valid JSON without additional text or markdown formatting.
         """
         Analyze multiple resumes in batch with concurrency control.
         """
+        # Add metadata to Opik tracking
+        if OPIK_AVAILABLE:
+            try:
+                opik_context.update_current_span(
+                    metadata={
+                        "batch_type": "resume_analysis",
+                        "batch_size": len(extraction_results),
+                        "has_job_context": job_context is not None,
+                        "job_title": job_context.title if job_context else None,
+                        "max_concurrent": 3
+                    }
+                )
+            except Exception as e:
+                logger.warning(f"Failed to update Opik span metadata: {e}")
+        
         max_concurrent = 3  # Limit concurrent requests to Gemini API
         semaphore = asyncio.Semaphore(max_concurrent)
         
@@ -694,9 +916,26 @@ Return ONLY valid JSON without additional text or markdown formatting.
             analysis_results[file_key] = analysis
         
         logger.info(f"Batch analysis completed: {len(analysis_results)}/{len(extraction_results)} successful")
+        
+        # Update Opik tracking with batch outcome
+        if OPIK_AVAILABLE:
+            try:
+                success_rate = len(analysis_results) / len(extraction_results) if extraction_results else 0
+                opik_context.update_current_span(
+                    metadata={
+                        "batch_outcome": "completed",
+                        "successful_analyses": len(analysis_results),
+                        "failed_analyses": len(extraction_results) - len(analysis_results),
+                        "success_rate": success_rate
+                    }
+                )
+            except Exception as e:
+                logger.warning(f"Failed to update Opik span with batch outcome: {e}")
+        
         return analysis_results
     
     @classmethod
+    @track(name="gemini_service_test", tags=["gemini", "test", "availability"])
     async def test_service_availability(cls) -> Dict[str, Any]:
         """
         Test if Gemini service is available and working.

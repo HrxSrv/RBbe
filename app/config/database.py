@@ -17,11 +17,11 @@ class MongoDB:
             logger.success("Successfully connected to MongoDB")
             
             # Initialize Beanie with models
-            from app.models import Customer, User, Job, Candidate, Call
+            from app.models import Customer, User, Job, Candidate, Call, Prompt
             
             await init_beanie(
                 database=cls.client[settings.mongodb_database],
-                document_models=[Customer, User, Job, Candidate, Call]
+                document_models=[Customer, User, Job, Candidate, Call, Prompt]
             )
             logger.success("Beanie ODM initialized successfully")
             

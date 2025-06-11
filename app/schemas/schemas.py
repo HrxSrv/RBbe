@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, validator
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 # Authentication schemas
@@ -77,6 +77,17 @@ class JobQuestionResponse(BaseModel):
     ideal_answer: str
     weight: float
 
+# Salary range schema
+class SalaryRangeCreate(BaseModel):
+    min_salary: Optional[int] = None
+    max_salary: Optional[int] = None
+    currency: str = "USD"
+
+class SalaryRangeResponse(BaseModel):
+    min_salary: Optional[int]
+    max_salary: Optional[int]
+    currency: str
+
 # Job schemas
 class JobCreate(BaseModel):
     title: str
@@ -87,6 +98,9 @@ class JobCreate(BaseModel):
     experience_level: Optional[str] = None
     remote_allowed: bool = False
     questions: List[JobQuestionCreate] = []
+    salary_range: Optional[SalaryRangeCreate] = None
+    department: Optional[str] = None
+    application_deadline: Optional[datetime] = None
     
     @validator('title')
     def title_not_empty(cls, v):
@@ -106,6 +120,12 @@ class JobResponse(BaseModel):
     view_count: int
     application_count: int
     questions: List[JobQuestionResponse] = []
+    salary_range: Optional[SalaryRangeResponse] = None
+    department: Optional[str] = None
+    experience_level: Optional[str] = None
+    remote_allowed: bool = False
+    application_deadline: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
@@ -244,4 +264,65 @@ class StatusUpdateResponse(BaseModel):
     new_status: str
     updated_by: str
     timestamp: datetime
-    notes: Optional[str] = None 
+    notes: Optional[str] = None
+
+# Prompt management schemas
+class PromptCreate(BaseModel):
+    name: str
+    prompt_type: str  # Will be validated against PromptType enum
+    content: str
+    description: Optional[str] = None
+    version: str = "1.0"
+    is_default: bool = False
+    variables: Optional[List[str]] = None  # Auto-extracted if not provided
+    tags: List[str] = []
+    metadata: Dict[str, Any] = {}
+    customer_id: Optional[str] = None  # None for global prompts
+
+class PromptUpdate(BaseModel):
+    name: Optional[str] = None
+    content: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None  # Will be validated against PromptStatus enum
+    is_default: Optional[bool] = None
+    variables: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+class PromptResponse(BaseModel):
+    id: str
+    name: str
+    prompt_type: str
+    content: str
+    description: Optional[str]
+    version: str
+    status: str
+    is_default: bool
+    variables: List[str]
+    tags: List[str]
+    metadata: Dict[str, Any]
+    usage_count: int
+    success_rate: Optional[float]
+    created_at: datetime
+    updated_at: Optional[datetime]
+    last_used_at: Optional[datetime]
+    created_by: Optional[str]
+    customer_id: Optional[str]
+    
+    class Config:
+        from_attributes = True
+
+class PromptListResponse(BaseModel):
+    prompts: List[PromptResponse]
+    total: int
+    page: int
+    per_page: int
+    has_next: bool
+
+class PromptRenderRequest(BaseModel):
+    variables: Dict[str, Any]
+    
+class PromptRenderResponse(BaseModel):
+    rendered_content: str
+    variables_used: List[str]
+    missing_variables: List[str] = [] 

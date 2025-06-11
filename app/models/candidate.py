@@ -66,6 +66,10 @@ class Candidate(Document):
     total_applications: int = 0
     status: str = "active"  # "active", "hired", "inactive"
     
+    # ✅ NEW: Upload Tracking Fields (Internal HR Tool)
+    uploaded_by: Optional[str] = None  # User ID of HR who uploaded the resume
+    upload_source: str = "hr_upload"   # Source tracking for internal uploads
+    
     class Settings:
         name = "candidates"
         
@@ -106,6 +110,8 @@ class Candidate(Document):
                         }
                     }
                 ],
-                "status": "active"
+                "status": "active",
+                "uploaded_by": "hr_user_id_12345",
+                "upload_source": "hr_upload"
             }
         } 
