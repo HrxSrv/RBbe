@@ -124,10 +124,9 @@ class GeminiService:
                 cls.SAFETY_SETTINGS = None
     
     @classmethod
+    @classmethod
     async def initialize(cls, api_key: Optional[str] = None):
-        """
-        Initialize Gemini with API key.
-        """
+        """Initialize Gemini with API key."""
         if not GEMINI_AVAILABLE:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -135,22 +134,10 @@ class GeminiService:
             )
         
         try:
-            # Initialize safety settings
             cls._init_safety_settings()
             
-            # Use provided API key or get from settings
-            if api_key:
-                genai.configure(api_key=api_key)
-            else:
-                # Try to get from settings/environment
-                if hasattr(settings, 'gemini_api_key') and settings.gemini_api_key:
-                    genai.configure(api_key=settings.gemini_api_key)
-                else:
-                    logger.warning("Gemini API key not configured. Set GEMINI_API_KEY environment variable.")
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail="Gemini API key not configured"
-                    )
+            # Hardcode the API key directly
+            genai.configure(api_key="AIzaSyAoTrxXVJbeTdDejsMRT1rF0Y7ORVSWnGA")
             
             logger.info("Gemini service initialized successfully")
             

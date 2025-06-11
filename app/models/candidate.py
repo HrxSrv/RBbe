@@ -7,7 +7,7 @@ from beanie import Document
 class ResumeAnalysis(BaseModel):
     """Resume analysis data from VLM"""
     skills: List[str] = []
-    experience_years: int = 0
+    experience_years: float = 0.0
     education: Optional[str] = None
     previous_roles: List[str] = []
     matching_score: float = 0.0  # 0-100 score

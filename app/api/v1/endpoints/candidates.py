@@ -542,7 +542,7 @@ async def get_candidate(
     AUTHENTICATION REQUIRED.
     """
     try:
-        from app.models.candidate import Candidate
+        from app.models.candidate import Candidate, ResumeAnalysis
         
         candidate = await Candidate.get(candidate_id)
         if not candidate:
@@ -554,10 +554,13 @@ async def get_candidate(
         # TODO: Add company access verification
         # Verify candidate applied to a job from current user's company
         
+        # Handle potentially missing resume_analysis
+        resume_analysis = candidate.resume_analysis or ResumeAnalysis()
+        
         return CandidateResponse(
             id=str(candidate.id),
             personal_info=candidate.personal_info.dict(),
-            resume_analysis=candidate.resume_analysis.dict(),
+            resume_analysis=resume_analysis.dict(),
             applications=[app.dict() for app in candidate.applications],
             total_applications=candidate.total_applications,
             status=candidate.status

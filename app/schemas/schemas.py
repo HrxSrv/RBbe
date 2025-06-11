@@ -183,7 +183,7 @@ class PersonalInfoCreate(BaseModel):
 
 class ResumeAnalysisCreate(BaseModel):
     skills: List[str] = []
-    experience_years: int = 0
+    experience_years: float
     education: Optional[str] = None
     previous_roles: List[str] = []
     matching_score: float = 0.0

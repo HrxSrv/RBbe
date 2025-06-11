@@ -22,9 +22,8 @@ class Settings(BaseSettings):
     # Google OAuth endpoints
     google_auth_uri: str = "https://accounts.google.com/o/oauth2/auth"
     google_token_uri: str = "https://oauth2.googleapis.com/token"
-    
-    # Gemini AI settings
-    gemini_api_key: str = ""  # Optional - for VLM integration
+      # Gemini AI settings
+    gemini_api_key: str  # Required - Gemini API key for language model
     
     # Opik tracking settings
     opik_api_key: str = ""  # Optional - for LLM tracking
